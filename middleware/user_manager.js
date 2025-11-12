@@ -160,7 +160,8 @@ async function get_api_key(req, res) {
   }
 }
 async function revoke_api_key(req, res) {
-  const authHeader = req.headers.authorization;
+  try {
+    const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(400).json({ error: 'Authorization header with Bearer token is required' });
     }
@@ -171,30 +172,41 @@ async function revoke_api_key(req, res) {
     if (!userData.verified) {
       return res.status(401).json({ error: 'Unauthorized: Invalid Google token' });
     }
-  const { google_id, email } = userData;
-  const userResult = await runQuery(
-    `SELECT id FROM users WHERE google_auth_id = $1`,
-    [google_id]
-  );
-  if (userResult.rows.length === 0) {
-    return res.status(404).json({ error: 'User not found. Please register first.' });
+
+    const { google_id, email } = userData;
+    const userResult = await runQuery(
+      `SELECT id FROM users WHERE google_auth_id = $1`,
+      [google_id]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found. Please register first.' });
+    }
+
+    const user_id = userResult.rows[0].id;
+    const applicationResult = await runQuery(
+      `SELECT id FROM applications WHERE user_id = $1`,
+      [user_id]
+    );
+
+    if (applicationResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Application not found. Please create an application first.' });
+    }
+
+    const application_id = applicationResult.rows[0].id;
+    const apiKeyResult = await runQuery(
+      `UPDATE api_keys SET is_revoked = true WHERE application_id = $1`,
+      [application_id]
+    );
+
+    if (apiKeyResult.rowCount === 0) {
+      return res.status(404).json({ error: 'API key not found. Please generate an API key first.' });
+    }
+
+    res.status(200).json({ success: true, message: 'API key revoked successfully' });
+  } catch (error) {
+    console.error('Revoke api key error:', error);
+    res.status(500).json({ error: 'Failed to revoke api key', details: error.message });
   }
-  const user_id = userResult.rows[0].id;
-  const applicationResult = await runQuery(
-    `SELECT id FROM applications WHERE user_id = $1`,
-    [user_id]
-  );
-  if (applicationResult.rows.length === 0) {
-    return res.status(404).json({ error: 'Application not found. Please create an application first.' });
-  }
-  const application_id = applicationResult.rows[0].id;
-  const apiKeyResult = await runQuery(
-    `UPDATE api_keys SET is_revoked = true WHERE application_id = $1`,
-    [application_id]
-  );
-  if (apiKeyResult.rowCount === 0) {
-    return res.status(404).json({ error: 'API key not found. Please generate an API key first.' });
-  }
-  res.status(200).json({ success: true, message: 'API key revoked successfully' });
 }
 module.exports = { registerUser, get_api_key, revoke_api_key };
