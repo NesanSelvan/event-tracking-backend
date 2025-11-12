@@ -1,0 +1,670 @@
+openapi: 3.0.3
+info:
+  title: Event Tracking Backend API
+  description: |
+    A scalable backend system for tracking and analyzing user events across websites and mobile applications.
+
+    ## Authentication
+    - **User Management Endpoints**: Use Bearer token (Google OAuth ID token)
+    - **Analytics Endpoints**: Use x-api-key header
+
+    ## Base URL
+    - **Production**: https://event-tracking-backend-uhh9.onrender.com
+    - **Local**: http://localhost:3000
+  version: 1.0.0
+  contact:
+    name: Nesan Selvan
+    url: https://github.com/NesanSelvan/event-tracking-backend
+
+servers:
+  - url: https://event-tracking-backend-uhh9.onrender.com
+    description: Production server
+  - url: http://localhost:3000
+    description: Local development server
+
+tags:
+  - name: Authentication
+    description: User authentication and API key management
+  - name: Analytics
+    description: Event collection and analytics endpoints
+
+paths:
+  /auth/google:
+    get:
+      tags:
+        - Authentication
+      summary: Initiate Google OAuth flow
+      description: Redirects user to Google OAuth consent screen
+      responses:
+        '302':
+          description: Redirect to Google OAuth
+
+  /auth/google/callback:
+    get:
+      tags:
+        - Authentication
+      summary: Google OAuth callback
+      description: Handles OAuth callback and returns tokens
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Authorization code from Google
+      responses:
+        '200':
+          description: OAuth tokens retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Use this id_token in /register endpoint"
+                  id_token:
+                    type: string
+                    example: "eyJhbGciOiJSUzI1NiIsImtpZCI6..."
+                  access_token:
+                    type: string
+                    example: "ya29.a0AfH6SMBx..."
+                  expires_in:
+                    type: integer
+                    example: 3599
+        '500':
+          description: OAuth error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Register user and create application
+      description: Creates user account, application, and generates API key
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                app_name:
+                  type: string
+                  example: "My Analytics App"
+                domain:
+                  type: string
+                  example: "example.com"
+      responses:
+        '200':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  user:
+                    $ref: '#/components/schemas/User'
+                  application:
+                    $ref: '#/components/schemas/Application'
+                  api_key:
+                    type: string
+                    example: "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6"
+        '400':
+          description: Missing authorization header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid Google token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Registration failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/api-key:
+    get:
+      tags:
+        - Authentication
+      summary: Get API keys
+      description: Retrieve all active API keys for the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: API keys retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  user:
+                    type: object
+                    properties:
+                      google_id:
+                        type: string
+                        example: "1234567890"
+                      email:
+                        type: string
+                        example: "user@example.com"
+                  api_keys:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ApiKeyDetails'
+        '400':
+          description: Missing authorization header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid Google token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: No API keys found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Failed to retrieve API keys
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/revoke-api-key:
+    post:
+      tags:
+        - Authentication
+      summary: Revoke API key
+      description: Revokes the current API key for the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: API key revoked successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "API key revoked successfully"
+        '400':
+          description: Missing authorization header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid Google token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: User or API key not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Failed to revoke API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/regenerate-api-key:
+    post:
+      tags:
+        - Authentication
+      summary: Regenerate API key
+      description: Generates a new API key and resets revocation status
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: API key regenerated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "API key regenerated successfully"
+                  api_key:
+                    type: string
+                    example: "z9y8x7w6v5u4t3s2r1q0p9o8n7m6l5k4"
+                  created_at:
+                    type: string
+                    format: date-time
+                    example: "2025-01-13T10:00:00Z"
+                  expires_at:
+                    type: string
+                    format: date-time
+                    example: "2026-01-13T10:00:00Z"
+        '400':
+          description: Missing authorization header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid Google token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: User or application not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Failed to regenerate API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/analytics/collect:
+    post:
+      tags:
+        - Analytics
+      summary: Collect event
+      description: Records a new event for analytics tracking
+      security:
+        - apiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - event
+              properties:
+                event:
+                  type: string
+                  example: "button_click"
+                  description: Event name
+                user_id:
+                  type: string
+                  example: "user_123"
+                  description: User identifier
+                url:
+                  type: string
+                  example: "https://example.com/page"
+                  description: Page URL where event occurred
+                referrer:
+                  type: string
+                  example: "https://google.com"
+                  description: Referrer URL
+                device:
+                  type: string
+                  example: "mobile"
+                  description: Device type (mobile/desktop/tablet)
+                ipAddress:
+                  type: string
+                  example: "192.168.1.1"
+                  description: User's IP address
+                timestamp:
+                  type: string
+                  format: date-time
+                  example: "2024-02-20T12:34:56Z"
+                  description: Event timestamp (optional, defaults to current time)
+                metadata:
+                  type: object
+                  example:
+                    browser: "Chrome"
+                    os: "iOS"
+                    version: "1.0.0"
+                  description: Additional event metadata
+      responses:
+        '201':
+          description: Event collected successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  event_id:
+                    type: string
+                    format: uuid
+                    example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                  recorded_at:
+                    type: string
+                    format: date-time
+                    example: "2024-02-20T12:34:56Z"
+        '400':
+          description: Invalid request (missing event name or invalid timestamp)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: API key revoked or expired
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKeyError'
+        '500':
+          description: Failed to collect event
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/analytics/event-summary:
+    get:
+      tags:
+        - Analytics
+      summary: Get event summary
+      description: Retrieve aggregated statistics for a specific event
+      security:
+        - apiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - event
+              properties:
+                event:
+                  type: string
+                  example: "button_click"
+                  description: Event name to analyze
+                startDate:
+                  type: string
+                  format: date
+                  example: "2024-01-01"
+                  description: Start date for filtering (optional)
+                endDate:
+                  type: string
+                  format: date
+                  example: "2024-12-31"
+                  description: End date for filtering (optional)
+      responses:
+        '200':
+          description: Event summary retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  event:
+                    type: string
+                    example: "button_click"
+                  count:
+                    type: integer
+                    example: 1523
+                    description: Total event count
+                  uniqueUsers:
+                    type: integer
+                    example: 847
+                    description: Number of unique users
+                  deviceData:
+                    type: object
+                    example:
+                      mobile: 892
+                      desktop: 531
+                      tablet: 100
+                    description: Event count by device type
+        '400':
+          description: Missing event name
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: API key revoked or expired
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKeyError'
+        '500':
+          description: Failed to get summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/analytics/user-stats:
+    get:
+      tags:
+        - Analytics
+      summary: Get user statistics
+      description: Retrieve analytics data for a specific user
+      security:
+        - apiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - userId
+              properties:
+                userId:
+                  type: string
+                  example: "user_123"
+                  description: User identifier to get stats for
+      responses:
+        '200':
+          description: User stats retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  userId:
+                    type: string
+                    example: "user_123"
+                  totalEvents:
+                    type: integer
+                    example: 45
+                    description: Total events for this user
+                  deviceDetails:
+                    type: object
+                    properties:
+                      browser:
+                        type: string
+                        example: "Chrome"
+                      os:
+                        type: string
+                        example: "iOS"
+                  ipAddress:
+                    type: string
+                    example: "192.168.1.1"
+        '400':
+          description: Missing userId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: API key revoked or expired
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKeyError'
+        '404':
+          description: No events found for user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Failed to get user stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Google OAuth ID token
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: API key for analytics endpoints
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        google_id:
+          type: string
+          example: "1234567890"
+        email:
+          type: string
+          format: email
+          example: "user@example.com"
+        name:
+          type: string
+          example: "John Doe"
+
+    Application:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "660f9500-f39c-52e5-b827-557766551111"
+        name:
+          type: string
+          example: "My Analytics App"
+        domain:
+          type: string
+          example: "example.com"
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00Z"
+
+    ApiKeyDetails:
+      type: object
+      properties:
+        api_key:
+          type: string
+          example: "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6"
+        is_revoked:
+          type: boolean
+          example: false
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00Z"
+        expires_at:
+          type: string
+          format: date-time
+          example: "2025-01-15T10:30:00Z"
+        application_id:
+          type: string
+          format: uuid
+          example: "660f9500-f39c-52e5-b827-557766551111"
+        app_name:
+          type: string
+          example: "My Analytics App"
+        domain:
+          type: string
+          example: "example.com"
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Error message"
+        details:
+          type: string
+          example: "Detailed error information"
+
+    ApiKeyError:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "API key has expired"
+        message:
+          type: string
+          example: "Your API key has expired. Please regenerate a new key using the /api/auth/regenerate-api-key endpoint."
+        code:
+          type: string
+          enum:
+            - KEY_EXPIRED
+            - KEY_REVOKED
+          example: "KEY_EXPIRED"
+        expired_at:
+          type: string
+          format: date-time
+          example: "2024-12-31T23:59:59Z"
+          description: Only present for KEY_EXPIRED errors

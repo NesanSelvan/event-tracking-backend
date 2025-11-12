@@ -4,6 +4,8 @@
 
 **Production URL:** https://event-tracking-backend-uhh9.onrender.com
 
+**API Documentation:** https://app.swaggerhub.com/apis/nesan/event-tracking-backend-api/1.0.0
+
 ## Overview
 
 This is a production-ready event analytics engine that provides:
