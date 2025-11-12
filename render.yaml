@@ -1,0 +1,44 @@
+services:
+  - type: web
+    name: event-tracking-backend
+    runtime: docker
+    plan: free
+    region: oregon
+    branch: main
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DB_HOST
+        fromDatabase:
+          name: event-tracking-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: event-tracking-db
+          property: port
+      - key: DB_USER
+        fromDatabase:
+          name: event-tracking-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: event-tracking-db
+          property: password
+      - key: DB_NAME
+        fromDatabase:
+          name: event-tracking-db
+          property: database
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+
+databases:
+  - name: event-tracking-db
+    databaseName: analytics_db
+    user: analytics_user
+    plan: free
+    region: oregon
