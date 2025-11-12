@@ -23,11 +23,20 @@ async function collectEvent(req, res) {
     const keyData = keyQuery.rows[0];
 
     if (keyData.is_revoked) {
-      return res.status(401).json({ error: 'API key revoked' });
+      return res.status(403).json({
+        error: 'API key has been revoked',
+        message: 'Your API key has been revoked. Please regenerate a new key using the /api/auth/regenerate-api-key endpoint.',
+        code: 'KEY_REVOKED'
+      });
     }
 
     if (keyData.expires_at && new Date(keyData.expires_at) < new Date()) {
-      return res.status(401).json({ error: 'API key expired' });
+      return res.status(403).json({
+        error: 'API key has expired',
+        message: 'Your API key has expired. Please regenerate a new key using the /api/auth/regenerate-api-key endpoint.',
+        expired_at: keyData.expires_at,
+        code: 'KEY_EXPIRED'
+      });
     }
 
     const { event, user_id, url, referrer, device, ipAddress, timestamp, metadata } = req.body;
@@ -92,11 +101,20 @@ async function getEventSummary(req, res) {
     const keyData = keyQuery.rows[0];
 
     if (keyData.is_revoked) {
-      return res.status(401).json({ error: 'API key revoked' });
+      return res.status(403).json({
+        error: 'API key has been revoked',
+        message: 'Your API key has been revoked. Please regenerate a new key using the /api/auth/regenerate-api-key endpoint.',
+        code: 'KEY_REVOKED'
+      });
     }
 
     if (keyData.expires_at && new Date(keyData.expires_at) < new Date()) {
-      return res.status(401).json({ error: 'API key expired' });
+      return res.status(403).json({
+        error: 'API key has expired',
+        message: 'Your API key has expired. Please regenerate a new key using the /api/auth/regenerate-api-key endpoint.',
+        expired_at: keyData.expires_at,
+        code: 'KEY_EXPIRED'
+      });
     }
 
     const { event, startDate, endDate } = req.body;
@@ -180,11 +198,20 @@ async function getUserStats(req, res) {
     const keyData = keyQuery.rows[0];
 
     if (keyData.is_revoked) {
-      return res.status(401).json({ error: 'API key revoked' });
+      return res.status(403).json({
+        error: 'API key has been revoked',
+        message: 'Your API key has been revoked. Please regenerate a new key using the /api/auth/regenerate-api-key endpoint.',
+        code: 'KEY_REVOKED'
+      });
     }
 
     if (keyData.expires_at && new Date(keyData.expires_at) < new Date()) {
-      return res.status(401).json({ error: 'API key expired' });
+      return res.status(403).json({
+        error: 'API key has expired',
+        message: 'Your API key has expired. Please regenerate a new key using the /api/auth/regenerate-api-key endpoint.',
+        expired_at: keyData.expires_at,
+        code: 'KEY_EXPIRED'
+      });
     }
 
     const { userId } = req.body;

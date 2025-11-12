@@ -209,4 +209,67 @@ async function revoke_api_key(req, res) {
     res.status(500).json({ error: 'Failed to revoke api key', details: error.message });
   }
 }
-module.exports = { registerUser, get_api_key, revoke_api_key };
+
+async function regenerate_api_key(req, res) {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(400).json({ error: 'Authorization header with Bearer token is required' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    const userData = await verifyGoogleToken(token);
+
+    if (!userData.verified) {
+      return res.status(401).json({ error: 'Unauthorized: Invalid Google token' });
+    }
+
+    const { google_id, email } = userData;
+    const userResult = await runQuery(
+      `SELECT id FROM users WHERE google_auth_id = $1`,
+      [google_id]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found. Please register first.' });
+    }
+
+    const user_id = userResult.rows[0].id;
+    const applicationResult = await runQuery(
+      `SELECT id FROM applications WHERE user_id = $1`,
+      [user_id]
+    );
+
+    if (applicationResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Application not found. Please create an application first.' });
+    }
+
+    const application_id = applicationResult.rows[0].id;
+    const new_api_key = generate_api_key();
+
+    const updateResult = await runQuery(
+      `UPDATE api_keys
+       SET api_key = $1, is_revoked = false, expires_at = $2, created_at = NOW()
+       WHERE application_id = $3
+       RETURNING api_key, created_at, expires_at`,
+      [new_api_key, new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), application_id]
+    );
+
+    if (updateResult.rows.length === 0) {
+      return res.status(404).json({ error: 'No API key found for this application.' });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'API key regenerated successfully',
+      api_key: updateResult.rows[0].api_key,
+      created_at: updateResult.rows[0].created_at,
+      expires_at: updateResult.rows[0].expires_at
+    });
+  } catch (error) {
+    console.error('Regenerate API key error:', error);
+    res.status(500).json({ error: 'Failed to regenerate API key', details: error.message });
+  }
+}
+
+module.exports = { registerUser, get_api_key, revoke_api_key, regenerate_api_key };
